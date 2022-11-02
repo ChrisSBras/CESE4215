@@ -300,8 +300,6 @@ class SimulatedOrchestrator(Orchestrator):
                 average_deadline = 0
                 sim_time = time.time() - start_time
 
-                print("Timing")
-
                 curr_task: ArrivalTask = self.pending_tasks.get()
 
                 time_until_deadline = curr_task.deadline - sim_time
@@ -345,20 +343,14 @@ class SimulatedOrchestrator(Orchestrator):
                 self._logger.info(
                     f"Running epochs: {curr_task.hyper_parameters.default.total_epochs}")
 
-                # epochs = min(
-                # epochs, curr_task.hyper_parameters.default.total_epochs)
-
                 print(f"Will be running {epochs} epochs")
 
-                # curr_task.hyper_parameters.configurations['Worker'].total_epochs = epochs
-                # curr_task.hyper_parameters.configurations['Master'].total_epochs = epochs
-                # curr_task.hyper_parameters.default.total_epochs = epochs
+                curr_task.hyper_parameters.configurations['Worker'].total_epochs = epochs
+                curr_task.hyper_parameters.configurations['Master'].total_epochs = epochs
+                curr_task.hyper_parameters.default.total_epochs = epochs
 
                 self._logger.info(
-                    "BASELINERUN---------------------------------------------------")
-                # curr_task.hyper_parameters.configurations['Worker']
-                # curr_task.hyper_parameters.configurations['Master'].total_epochs = 0
-                # curr_task.hyper_parameters.default.total_epochs = 0
+                    "---------------------------------------------------")
 
                 self._logger.info(
                     f"Scheduling arrival of Arrival: {curr_task.id}")
