@@ -6,6 +6,8 @@ import logging
 import re
 import time
 import uuid
+import pickle
+import numpy as np
 from queue import PriorityQueue
 from typing import OrderedDict, Dict, Type, Set, Union, Optional, List
 from typing import TYPE_CHECKING
@@ -25,6 +27,11 @@ from fltk.util.task.generator import ArrivalGenerator
 if TYPE_CHECKING:
     from fltk.util.config import DistributedConfig
 
+
+DATASETS = ["fashion-mnist", "cifar10"]
+MODELS = ["FashionMNISTCNN", "Cifar10CNN"]
+OPTIMISERS = ["SGD", "Adam"]
+LRS = [1e-3, 1e-4]
 
 # Setup required variables for Jinja templates.
 EXPERIMENT_DIR = 'experiments'
@@ -71,7 +78,8 @@ def render_template(task: ArrivalTask, tpe: str, replication: int, experiment_pa
         template = __ENV.get_template('dist_node.jinja.yaml')
     else:
         raise Exception(f"Cannot handle type of task: {task}")
-    filled_template = template.render(task=task, tpe=tpe, replication=replication, experiment_path=experiment_path)
+    filled_template = template.render(
+        task=task, tpe=tpe, replication=replication, experiment_path=experiment_path)
     return filled_template
 
 
@@ -97,8 +105,10 @@ def _prepare_experiment_maps(task: ArrivalTask, config: DistributedConfig, u_id:
         meta = V1ObjectMeta(name=name,
                             labels={'app.kubernetes.io/name': f"fltk.node.config.{tpe}"})
         exp_path = _generate_experiment_path_name(task, u_id, config)
-        filled_template = render_template(task=task, tpe=tpe, replication=replication, experiment_path=exp_path)
-        type_dict[tpe] = V1ConfigMap(data={'node.config.yaml': filled_template}, metadata=meta)
+        filled_template = render_template(
+            task=task, tpe=tpe, replication=replication, experiment_path=exp_path)
+        type_dict[tpe] = V1ConfigMap(
+            data={'node.config.yaml': filled_template}, metadata=meta)
         name_dict[tpe] = name
     return type_dict, name_dict
 
@@ -112,10 +122,13 @@ def _generate_task(arrival) -> ArrivalTask:
     @rtype: ArrivalTask
     """
     unique_identifier: uuid.UUID = uuid.uuid4()
-    task_type: Type[ArrivalTask] = get_job_arrival_class(arrival.task.experiment_type)
+    task_type: Type[ArrivalTask] = get_job_arrival_class(
+        arrival.task.experiment_type)
+
     task = task_type.build(arrival=arrival,
                            u_id=unique_identifier,
                            replication=arrival.task.replication)
+
     return task
 
 
@@ -188,20 +201,22 @@ class Orchestrator(DistNode, abc.ABC):
         @rtype: None
         """
         namespace = self._config.cluster_config.namespace
-        self._logger.info(f'Clearing old jobs in current namespace: {namespace}')
+        self._logger.info(
+            f'Clearing old jobs in current namespace: {namespace}')
 
         for job in self._client.get(namespace=self._config.cluster_config.namespace)['items']:
             job_name = job['metadata']['name']
             self._logger.info(f'Deleting: {job_name}')
             try:
                 self._client.custom_api.delete_namespaced_custom_object(
-                        PYTORCHJOB_GROUP,
-                        PYTORCHJOB_VERSION,
-                        namespace,
-                        PYTORCHJOB_PLURAL,
-                        job_name)
+                    PYTORCHJOB_GROUP,
+                    PYTORCHJOB_VERSION,
+                    namespace,
+                    PYTORCHJOB_PLURAL,
+                    job_name)
             except Exception as excp:
-                self._logger.warning(f'Could not delete: {job_name}. Reason: {excp}')
+                self._logger.warning(
+                    f'Could not delete: {job_name}. Reason: {excp}')
 
     def _create_config_maps(self, config_maps: Dict[str, V1ConfigMap]) -> None:
         """
@@ -219,9 +234,11 @@ class Orchestrator(DistNode, abc.ABC):
         experiments interfere with each other.
         """
         if others:
-            uuid_regex = re.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+            uuid_regex = re.compile(
+                "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
-            ids = {uuid_regex.search(task).group() for task in others if uuid_regex.search(task) is not None}
+            ids = {uuid_regex.search(task).group(
+            ) for task in others if uuid_regex.search(task) is not None}
             historical_tasks = map(HistoricalArrivalTask, ids)
             self.deployed_tasks.update(historical_tasks)
         while len(self.deployed_tasks) > 0:
@@ -231,14 +248,17 @@ class Orchestrator(DistNode, abc.ABC):
                     job_status = self._client.get_job_status(name=f"trainjob-{task.id}",
                                                              namespace='test')
                 except Exception as e:
-                    logging.debug(msg=f"Could not retrieve job_status for {task.id}")
+                    logging.debug(
+                        msg=f"Could not retrieve job_status for {task.id}")
                     job_status = None
 
                 if job_status and job_status in {'Completed', 'Failed', 'Succeeded'}:
-                    logging.info(f"{task.id} was completed with status: {job_status}, moving to completed")
+                    logging.info(
+                        f"{task.id} was completed with status: {job_status}, moving to completed")
                     task_to_move.add(task)
                 else:
-                    logging.info(f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, {self._arrival_generator.arrivals.qsize()} arrivals")
+                    logging.info(
+                        f"Waiting for {task.id} to complete, {self.pending_tasks.qsize()} pending, {self._arrival_generator.arrivals.qsize()} arrivals")
             self.completed_tasks.update(task_to_move)
             self.deployed_tasks.difference_update(task_to_move)
             time.sleep(self.SLEEP_TIME)
@@ -253,9 +273,14 @@ class SimulatedOrchestrator(Orchestrator):
     def __init__(self, cluster_mgr: ClusterManager, arrival_generator: ArrivalGenerator, config: DistributedConfig):
         super().__init__(cluster_mgr, arrival_generator, config)
 
+        with open("data/model.m", "rb") as f:
+            model_code = f.read()
+            self.model = pickle.loads(model_code)
+
     def run(self, clear: bool = False, experiment_replication: int = -1) -> None:
         self._alive = True
         start_time = time.time()
+        drop_count = 0
         if clear:
             self._clear_jobs()
         while self._alive and time.time() - start_time < self._config.get_duration():
@@ -264,34 +289,108 @@ class SimulatedOrchestrator(Orchestrator):
             while not self._arrival_generator.arrivals.empty():
                 arrival = self._arrival_generator.arrivals.get()
                 task = _generate_task(arrival)
-                self._logger.debug(f"Arrival of: {task}")
+                self._logger.debug(
+                    f"Arrival of: {task} with deadline {task.deadline}")
                 self.pending_tasks.put(task)
 
+            self.wait_for_jobs_to_complete()
             # Deploy all pending tasks without logic
-            while not self.pending_tasks.empty():
+            if not self.pending_tasks.empty():
+
+                average_deadline = 0
+                sim_time = time.time() - start_time
+
+                print("Timing")
+
                 curr_task: ArrivalTask = self.pending_tasks.get()
-                self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
+
+                time_until_deadline = curr_task.deadline - sim_time
+
+                self._logger.info(
+                    "---------------------------------------------------")
+                self._logger.info(
+                    f"Running queue length {len(self.pending_tasks.queue) + 1}")
+                self._logger.info(
+                    f"Started Task with id {curr_task.id} has params LR: {curr_task.hyper_parameters.default.optimizer_config.lr} Epochs: {curr_task.hyper_parameters.default.total_epochs} Opt: {curr_task.hyper_parameters.default.optimizer_config.type.value} DS-NW: {curr_task.network.value}, TIME: {sim_time}, DEADLINE: {curr_task.deadline}, TIME LEFT: {time_until_deadline}")
+                self._logger.info(
+                    f"DEADLINE: {curr_task.deadline}, TIME TILL DEADLINE: {time_until_deadline}")
+
+                time_until_deadline /= len(self.pending_tasks.queue) + 1
+
+                self._logger.info(f"Adjusted deadline: {time_until_deadline}")
+
+                model = curr_task.network.value
+                dataset = curr_task.dataset.value
+                optimiser = curr_task.hyper_parameters.default.optimizer_config.type.value
+                learning_rate = curr_task.hyper_parameters.default.optimizer_config.lr
+
+                model_id = MODELS.index(model)
+                dataset_id = DATASETS.index(dataset)
+                optimiser_id = OPTIMISERS.index(optimiser)
+                lr_id = LRS.index(learning_rate)
+
+                data_row = [model_id, dataset_id,
+                            optimiser_id, lr_id, time_until_deadline]
+
+                result = self.model.predict(np.array(data_row).reshape(1, -1))
+
+                epochs = max(0, int(round(result[0])))
+                epochs = min(80, epochs)
+
+                if time_until_deadline < 0:
+                    epochs = 0
+
+                self._logger.info(f"Predicted epochs: {epochs}")
+
+                self._logger.info(
+                    f"Running epochs: {curr_task.hyper_parameters.default.total_epochs}")
+
+                # epochs = min(
+                # epochs, curr_task.hyper_parameters.default.total_epochs)
+
+                print(f"Will be running {epochs} epochs")
+
+                # curr_task.hyper_parameters.configurations['Worker'].total_epochs = epochs
+                # curr_task.hyper_parameters.configurations['Master'].total_epochs = epochs
+                # curr_task.hyper_parameters.default.total_epochs = epochs
+
+                self._logger.info(
+                    "BASELINERUN---------------------------------------------------")
+                # curr_task.hyper_parameters.configurations['Worker']
+                # curr_task.hyper_parameters.configurations['Master'].total_epochs = 0
+                # curr_task.hyper_parameters.default.total_epochs = 0
+
+                self._logger.info(
+                    f"Scheduling arrival of Arrival: {curr_task.id}")
                 # Create persistent logging information. A these will not be deleted by the Orchestrator, as such, they
                 # allow you to retrieve information of experiments after removing the PytorchJob after completion.
                 config_dict, configmap_name_dict = _prepare_experiment_maps(curr_task,
                                                                             config=self._config,
                                                                             u_id=curr_task.id,
                                                                             replication=experiment_replication)
-                self._create_config_maps(config_dict)
 
-                job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
-                self._logger.info(f"Deploying on cluster: {curr_task.id}")
-                self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
-                self.deployed_tasks.add(curr_task)
+                if epochs > 0:  # drop task if no epochs to run
+                    self._create_config_maps(config_dict)
 
-                # TODO: Extend this logic in your real project, this is only meant for demo purposes
-                # For now we exit the thread after scheduling a single task.
+                    job_to_start = construct_job(
+                        self._config, curr_task, configmap_name_dict)
+                    self._logger.info(f"Deploying on cluster: {curr_task.id}")
+                    self._client.create(
+                        job_to_start, namespace=self._config.cluster_config.namespace)
+
+                    self.deployed_tasks.add(curr_task)
+                else:
+                    drop_count += 1
+                    self._logger.info(
+                        f"Dropped task {curr_task.id}, dropcount: {drop_count}")
 
             self._logger.info("Still alive...")
             # Prevent high cpu utilization by sleeping between checks.
             time.sleep(self.SLEEP_TIME)
         self.stop()
         self.wait_for_jobs_to_complete()
+
+        # Todo add stuff here to print after an experiment
         self._logger.info('Experiment completed.')
 
 
@@ -316,7 +415,8 @@ class BatchOrchestrator(Orchestrator):
         @return: None
         @rtype: None
         """
-        self._logger.info(f"Starting experiment Orchestrator: {experiment_replication}")
+        self._logger.info(
+            f"Starting experiment Orchestrator: {experiment_replication}")
         self._alive = True
         try:
             if wait_historical:
@@ -348,6 +448,16 @@ class BatchOrchestrator(Orchestrator):
         while not self.pending_tasks.empty():
             # Do blocking request to priority queue
             curr_task: ArrivalTask = self.pending_tasks.get()
+
+            curr_task.hyper_parameters.configurations['Worker'].total_epochs = 0
+            curr_task.hyper_parameters.configurations['Master'].total_epochs = 0
+            curr_task.hyper_parameters.default.total_epochs = 0
+
+            print("---------------------------")
+            print(curr_task.deadline)
+
+            print("---------------------------")
+
             self._logger.info(f"Scheduling arrival of Arrival: {curr_task.id}")
 
             # Create persistent logging information. A these will not be deleted by the Orchestrator, as such
@@ -356,16 +466,26 @@ class BatchOrchestrator(Orchestrator):
                                                                         config=self._config,
                                                                         u_id=curr_task.id,
                                                                         replication=experiment_replication)
+
+            # config_dict["Master"]["data"]["node.config.yaml"]["max_epoch"] = 0
+
             self._create_config_maps(config_dict)
 
-            job_to_start = construct_job(self._config, curr_task, configmap_name_dict)
+            print(
+                f"Running jobs with {curr_task.hyper_parameters.default.total_epochs} epochs")
+
+            job_to_start = construct_job(
+                self._config, curr_task, configmap_name_dict)
+
             self._logger.info(f"Deploying on cluster: {curr_task.id}")
-            self._client.create(job_to_start, namespace=self._config.cluster_config.namespace)
+            self._client.create(
+                job_to_start, namespace=self._config.cluster_config.namespace)
             self.deployed_tasks.add(curr_task)
             # Either wait to complete, or continue. Note that the orchestrator currently does not support scaling
             # experiments up or down.
             if not self._config.cluster_config.orchestrator.parallel_execution:
                 self.wait_for_jobs_to_complete()
+
         if self._config.cluster_config.orchestrator.parallel_execution:
             self.wait_for_jobs_to_complete()
         logging.info('Experiment completed.')

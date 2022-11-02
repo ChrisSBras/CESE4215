@@ -2,6 +2,7 @@ from typing import Optional
 
 from aenum import unique, Enum
 
+
 @unique
 class Nets(Enum):
     cifar100_resnet = 'Cifar100ResNet'
@@ -11,6 +12,8 @@ class Nets(Enum):
     fashion_mnist_cnn = 'FashionMNISTCNN'
     fashion_mnist_resnet = 'FashionMNISTResNet'
     mnist_cnn = 'MNISTCNN'
+    lenet_mnist = 'LenetMNIST'
+    cifar_10_lenet = 'Cifar10Lenet'
 
     @classmethod
     def _missing_name_(cls, name: str) -> 'Dataset':

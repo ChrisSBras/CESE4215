@@ -15,7 +15,8 @@ from fltk.util.config.experiment_config import (OptimizerConfig, HyperParameters
                                                 SamplerConfiguration, LearningParameters)
 from fltk.util.task.generator.arrival_generator import Arrival
 
-MASTER_REPLICATION: int = 1  # Static master replication value, dictated by PytorchTrainingJobs
+# Static master replication value, dictated by PytorchTrainingJobs
+MASTER_REPLICATION: int = 1
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ class _ArrivalTask(abc.ABC):
     Private parent of ArrivalTasks, used internally for allowing to track
     """
     id: UUID = field(compare=False)  # pylint: disable=invalid-name
+
 
 @dataclass(frozen=True)
 class HistoricalArrivalTask(abc.ABC):
@@ -44,6 +46,7 @@ class ArrivalTask(_ArrivalTask):
     loss_function: str = field(compare=False)
     seed: int = field(compare=False)
     replication: int = field(compare=False)
+    deadline: float = field(compare=False)
     type_map: "Optional[FrozenOrderedDict[str, int]]" = field(compare=False)
     system_parameters: SystemParameters = field(compare=False)
     hyper_parameters: HyperParameters = field(compare=False)
@@ -72,7 +75,8 @@ class ArrivalTask(_ArrivalTask):
         @rtype: OrderedDict[str, SystemResources]
         """
         sys_conf = self.system_parameters
-        ret_dict = collections.OrderedDict([(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
+        ret_dict = collections.OrderedDict(
+            [(tpe, sys_conf.get(tpe)) for tpe in self.type_map.keys()])
         return ret_dict
 
     def typed_replica_count(self, replica_type: str) -> int:
@@ -157,7 +161,8 @@ class ArrivalTask(_ArrivalTask):
         @return: Kwarg dict populated with optimizer configuration.
         @rtype: Dict[str, Any]
         """
-        optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[tpe].optimizer_config
+        optimizer_conf: OptimizerConfig = self.hyper_parameters.configurations[
+            tpe].optimizer_config
         kwargs = {
             'lr': optimizer_conf.lr,
         }
@@ -222,20 +227,21 @@ class DistributedArrivalTask(ArrivalTask):
 
         """
         task = DistributedArrivalTask(
-                id=u_id,
-                network=arrival.get_network(),
-                priority=arrival.get_priority(),
-                dataset=arrival.get_dataset(),
-                loss_function=arrival.task.network_configuration.loss_function,
-                seed=random.randint(0, 2**32 - 2),
-                replication=replication,
-                type_map=FrozenOrderedDict({
-                    'Master': MASTER_REPLICATION,
-                    'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
-                }),
-                system_parameters=arrival.get_system_config(),
-                hyper_parameters=arrival.get_parameter_config(),
-                learning_parameters=arrival.get_learning_config())
+            id=u_id,
+            network=arrival.get_network(),
+            priority=arrival.get_priority(),
+            dataset=arrival.get_dataset(),
+            loss_function=arrival.task.network_configuration.loss_function,
+            seed=random.randint(0, 2**32 - 2),
+            replication=replication,
+            type_map=FrozenOrderedDict({
+                'Master': MASTER_REPLICATION,
+                'Worker': arrival.task.system_parameters.data_parallelism - MASTER_REPLICATION
+            }),
+            deadline=arrival.get_deadline(),
+            system_parameters=arrival.get_system_config(),
+            hyper_parameters=arrival.get_parameter_config(),
+            learning_parameters=arrival.get_learning_config())
         return task
 
 
@@ -259,18 +265,18 @@ class FederatedArrivalTask(ArrivalTask):
 
         """
         task = FederatedArrivalTask(
-                id=u_id,
-                network=arrival.get_network(),
-                dataset=arrival.get_dataset(),
-                loss_function=arrival.task.network_configuration.loss_function,
-                seed=arrival.task.seed,
-                replication=replication,
-                type_map=FrozenOrderedDict({
-                    'Master': MASTER_REPLICATION,
-                    'Worker': arrival.task.system_parameters.data_parallelism
-                }),
-                system_parameters=arrival.get_system_config(),
-                hyper_parameters=arrival.get_parameter_config(),
-                priority=arrival.get_priority(),
-                learning_parameters=arrival.get_learning_config())
+            id=u_id,
+            network=arrival.get_network(),
+            dataset=arrival.get_dataset(),
+            loss_function=arrival.task.network_configuration.loss_function,
+            seed=arrival.task.seed,
+            replication=replication,
+            type_map=FrozenOrderedDict({
+                'Master': MASTER_REPLICATION,
+                'Worker': arrival.task.system_parameters.data_parallelism
+            }),
+            system_parameters=arrival.get_system_config(),
+            hyper_parameters=arrival.get_parameter_config(),
+            priority=arrival.get_priority(),
+            learning_parameters=arrival.get_learning_config())
         return task

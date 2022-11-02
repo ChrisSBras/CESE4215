@@ -65,15 +65,18 @@ class DistClient(DistNode):
         @return: None
         @rtype: None
         """
-        self._logger.info(f"Preparing learner model with distributed={distributed}")
+        self._logger.info(
+            f"Preparing learner model with distributed={distributed}")
         self.model.to(self.device)
         if distributed:
             # Wrap the model to use pytorch DistributedDataParallel wrapper for all reduce.
             self.model = torch.nn.parallel.DistributedDataParallel(self.model)
 
         # Currently, it is assumed to use an SGD optimizer, using non-federated optimizer types.
-        optim_type = get_optimizer(self.learning_params.optimizer, federated=False)
-        self.optimizer = optim_type(self.model.parameters(), **self.learning_params.optimizer_args)
+        optim_type = get_optimizer(
+            self.learning_params.optimizer, federated=False)
+        self.optimizer = optim_type(
+            self.model.parameters(), **self.learning_params.optimizer_args)
         self.scheduler = MinCapableStepLR(self.optimizer,
                                           self.learning_params.scheduler_step_size,
                                           self.learning_params.scheduler_gamma,
@@ -81,7 +84,7 @@ class DistClient(DistNode):
 
         if self.config.execution_config.tensorboard.active and self._id == 0:
             self.tb_writer = SummaryWriter(
-                    str(self.config.get_log_path(self._task_id, self._id, self.learning_params)))
+                str(self.config.get_log_path(self._task_id, self._id, self.learning_params)))
 
     def stop_learner(self):
         """
@@ -139,7 +142,8 @@ class DistClient(DistNode):
 
             running_loss += float(loss.detach().item())
             if i % log_interval == 0:
-                self._logger.info(f'[{epoch:d}, {i:5d}] loss: {running_loss / log_interval:.3f}')
+                self._logger.info(
+                    f'[{epoch:d}, {i:5d}] loss: {running_loss / log_interval:.3f}')
                 final_running_loss = running_loss / log_interval
                 running_loss = 0.0
         self.scheduler.step()
@@ -178,11 +182,13 @@ class DistClient(DistNode):
                 outputs = self.model(images)
                 # Currently, the FLTK framework assumes that a classification task is performed (hence max).
                 # Future work may add support for non-classification training.
-                _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
+                _, predicted = torch.max(
+                    outputs.data, 1)  # pylint: disable=no-member
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-                targets_.extend(labels.detach().cpu().view_as(predicted).numpy())
+                targets_.extend(
+                    labels.detach().cpu().view_as(predicted).numpy())
                 pred_.extend(predicted.detach().cpu().numpy())
 
                 loss += self.loss_function(outputs, labels).item()
@@ -193,7 +199,8 @@ class DistClient(DistNode):
         class_precision: np.array = calculate_class_precision(confusion_mat)
         class_recall: np.array = calculate_class_recall(confusion_mat)
 
-        self._logger.debug(f'Test set: Accuracy: {correct}/{total} ({accuracy:.0f}%)')
+        self._logger.debug(
+            f'Test set: Accuracy: {correct}/{total} ({accuracy:.0f}%)')
         self._logger.debug(f'Test set: Loss: {loss}')
         self._logger.debug(f"Confusion Matrix:\n{confusion_mat}")
         self._logger.debug(f"Class precision: {class_precision}")
@@ -211,6 +218,8 @@ class DistClient(DistNode):
         max_epoch = self.learning_params.max_epoch + 1
         start_time_train = datetime.datetime.now()
         epoch_results = []
+
+        print(f"Running epochs {max_epoch}")
         for epoch in range(1, max_epoch):
             train_loss = self.train(epoch)
 
@@ -246,8 +255,10 @@ class DistClient(DistNode):
         """
         @deprecated Move function to utils directory.
         """
-        self._logger.debug(f"Saving model to flat file storage. Saved at epoch #{epoch}")
-        save_model(self.model, str(self.config.get_save_model_folder_path()), epoch)
+        self._logger.debug(
+            f"Saving model to flat file storage. Saved at epoch #{epoch}")
+        save_model(self.model, str(
+            self.config.get_save_model_folder_path()), epoch)
 
     def log_progress(self, epoch_data: EpochData, epoch: int):
         """

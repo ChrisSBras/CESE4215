@@ -2,23 +2,27 @@
   "trainTasks": [
     {
       "type": "distributed",
-      "lambda": 1.5,
+      "lambda": 0.01,
       "preemptJobs": false,
+
       "jobClassParameters": [
         {
           "classProbability": 0.1,
+          "deadline": 1800,
           "priorities": [
             {
               "priority": 1,
-              "probability": 0.9
+              "probability": 0.9,
+              "deadline": 1800
             },
             {
               "priority": 0,
-              "probability": 0.1
+              "probability": 0.1,
+              "deadline": 1200
             }
           ],
           "networkConfiguration": {
-            "network": "FashionMNISTCNN",
+            "network": "LenetMNIST",
             "lossFunction": "CrossEntropyLoss",
             "dataset": "mnist"
           },
@@ -40,10 +44,7 @@
               "optimizerConfig": {
                 "type": "Adam",
                 "learningRate": 0.001,
-                "betas": [
-                  0.9,
-                  0.999
-                ]
+                "betas": [0.9, 0.999]
               },
               "schedulerConfig": {
                 "schedulerStepSize": 50,

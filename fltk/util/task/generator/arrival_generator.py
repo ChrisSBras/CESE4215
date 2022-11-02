@@ -45,7 +45,7 @@ class ArrivalGenerator(abc.ABC):  # pylint: disable=too-many-instance-attributes
         parser = ExperimentParser(config_path=self.configuration_path)
         experiment_descriptions = parser.parse()
         self.job_dict = collections.OrderedDict(
-                {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
+            {f'train_job_{indx}': item for indx, item in enumerate(experiment_descriptions.train_tasks)})
 
     def start(self, duration: int, seed: Optional[int] = None):
         """
@@ -107,6 +107,7 @@ class Arrival:
     ticks: Optional[int]
     task: TrainTask
     task_id: str
+    deadline: float
 
     def get_priority(self):  # pylint: disable=missing-function-docstring
         return self.task.priority
@@ -126,6 +127,9 @@ class Arrival:
     def get_learning_config(self) -> LearningParameters:  # pylint: disable=missing-function-docstring
         return self.task.learning_parameters
 
+    def get_deadline(self) -> float:
+        return self.deadline
+
 
 class SimulatedArrivalGenerator(ArrivalGenerator):
     """
@@ -143,7 +147,8 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
     _decrement = 10
 
     def __init__(self, custom_config: Path = None):
-        super(SimulatedArrivalGenerator, self).__init__(custom_config or self.configuration_path)
+        super(SimulatedArrivalGenerator, self).__init__(
+            custom_config or self.configuration_path)
         self.load_config()
 
     def set_logger(self, name: str = None):
@@ -173,16 +178,21 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         # Select job configuration according to the weight of the `classProbability` (limit 1)
         parameters, *_ = choices(job.job_class_parameters,
                                  [job_param.class_probability for job_param in job.job_class_parameters], k=1)
-        # Select job configuration according to the weight of the selected `classParameter`'s priorities (limit 1)
-        priority, *_ = choices(parameters.priorities, [prio.probability for prio in parameters.priorities], k=1)
 
-        inter_arrival_ticks = np.random.poisson(lam=job.arrival_statistic) * inter_arrival_unit.seconds
+        # Select job configuration according to the weight of the selected `classParameter`'s priorities (limit 1)
+        priority, *_ = choices(parameters.priorities,
+                               [prio.probability for prio in parameters.priorities], k=1)
+
+        inter_arrival_ticks = np.random.poisson(
+            lam=job.arrival_statistic) * inter_arrival_unit.seconds
+
         train_task = TrainTask(identity=task_id,
                                job_parameters=parameters,
                                priority=priority,
-                               experiment_type=job.experiment_type)
-
-        return Arrival(inter_arrival_ticks, train_task, task_id)
+                               deadline=inter_arrival_ticks + priority.deadline,
+                               experiment_type=job.experiment_type,
+                               )
+        return Arrival(inter_arrival_ticks, train_task, task_id, inter_arrival_ticks + priority.deadline)
 
     def run(self, duration: float, seed: Optional[int] = None) -> None:
         """
@@ -198,7 +208,8 @@ class SimulatedArrivalGenerator(ArrivalGenerator):
         @rtype: None
         """
         if seed:
-            self.logger.warning(f"Was provided seed: {seed}, is not supported for Simulated Arrivals.")
+            self.logger.warning(
+                f"Was provided seed: {seed}, is not supported for Simulated Arrivals.")
         self.start_time = time.time()
         self.logger.info("Populating tick lists with initial arrivals")
         for task_id in self.job_dict.keys():
@@ -266,7 +277,8 @@ class SequentialArrivalGenerator(ArrivalGenerator):
         description: JobDescription
         if not seed:
             replace_seed = random.randint(0, (2 ** 32) - 2)
-            logging.warning(f"Cannot generate repeatable experiments without seed, will set: {replace_seed}")
+            logging.warning(
+                f"Cannot generate repeatable experiments without seed, will set: {replace_seed}")
             seed = replace_seed
         for job_name, description in self.job_dict.items():
             for repl, job_class_param in enumerate(description.job_class_parameters):
@@ -279,5 +291,6 @@ class SequentialArrivalGenerator(ArrivalGenerator):
                                        seed=seed)
 
                 arrival = Arrival(None, train_task, job_name)
-                self.logger.info(f"(Sequentially) generate experiment: {replication_name}")
+                self.logger.info(
+                    f"(Sequentially) generate experiment: {replication_name}")
                 self.arrivals.put(arrival)

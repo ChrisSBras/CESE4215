@@ -13,6 +13,8 @@ from .fashion_mnist_resnet import FashionMNISTResNet
 from .mnist_cnn import MNIST_CNN
 from .reddit_lstm import RNNModel
 from .simple import SimpleMnist, SimpleNet
+from .lenet_mnist import LenetMNIST
+from .cifar_10_lenet import Cifar10Lenet
 
 
 def _available_nets() -> Dict[Nets, Type[torch.nn.Module]]:
@@ -29,6 +31,8 @@ def _available_nets() -> Dict[Nets, Type[torch.nn.Module]]:
         Nets.fashion_mnist_cnn: FashionMNISTCNN,
         Nets.fashion_mnist_resnet: FashionMNISTResNet,
         Nets.mnist_cnn: MNIST_CNN,
+        Nets.lenet_mnist: LenetMNIST,
+        Nets.cifar_10_lenet: Cifar10Lenet
     }
 
 
@@ -60,5 +64,7 @@ def get_net_split_point(name: Nets) -> int:
         Nets.fashion_mnist_cnn: 7,
         Nets.fashion_mnist_resnet: 7,
         Nets.mnist_cnn: 2,
+        Nets.lenet_mnist: 2,
+        Nets.cifar_10_lenet: 2
     }
     return nets_split_point[name]

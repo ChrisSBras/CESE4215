@@ -22,9 +22,14 @@ class TrainTask:
     learning_parameters: Optional[LearningParameters] = field(compare=False)
     seed: int = field(compare=False)
     identifier: str = field(compare=False)
-    replication: Optional[int] = field(compare=False, default=None)                     # Utilized for batch arrivals.
-    priority: Optional[int] = None                                                      # Allow for sorting/priority.
-    experiment_type: ExperimentType = field(compare=False, metadata=config(field_name="type"), default=None)
+    # Utilized for batch arrivals.
+    replication: Optional[int] = field(compare=False, default=None)
+    # Allow for sorting/priority.
+    priority: Optional[int] = None
+    experiment_type: ExperimentType = field(
+        compare=False, metadata=config(field_name="type"), default=None)
+
+    deadline: int = field(compare=False, default=0)
 
     def __init__(self,
                  identity: str,
@@ -32,7 +37,9 @@ class TrainTask:
                  priority: Priority = None,
                  replication: int = None,
                  experiment_type: ExperimentType = None,
-                 seed: int = None):
+                 seed: int = None,
+                 deadline: int = 0,
+                 ):
         """
         Overridden init method for dataclass, to allow for transposing a JobDescription to a flattened TrainTask, which
         contains the required information to schedule a task.
@@ -51,3 +58,4 @@ class TrainTask:
         self.replication = replication
         self.experiment_type = experiment_type
         self.seed = seed
+        self.deadline = deadline

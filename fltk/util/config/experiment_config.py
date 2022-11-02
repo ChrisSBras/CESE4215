@@ -28,7 +28,8 @@ class OptimizerConfig:
     type: Optional[Optimizations] = None
     momentum: Optional[Union[float, Tuple[float]]] = None
     betas: Optional[Union[float, Tuple[float]]] = None
-    lr: Optional[float] = field(metadata=config(field_name="learningRate"), default_factory=_none_factory)
+    lr: Optional[float] = field(metadata=config(
+        field_name="learningRate"), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -37,11 +38,12 @@ class SchedulerConfig:
     """Dataclass containing learning rate scheduler configuration."""
     scheduler_step_size: Optional[int] = None
     scheduler_gamma: Optional[float] = None
-    min_lr: Optional[float] = field(metadata=config(field_name="minimumLearningRate"), default_factory=_none_factory)
+    min_lr: Optional[float] = field(metadata=config(
+        field_name="minimumLearningRate"), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
-@dataclass(frozen=True)
+@dataclass(frozen=False)
 class HyperParameterConfiguration:
     """Dataclass containing training hyper parameters for learning tasks."""
     optimizer_config: Optional[OptimizerConfig] = field(metadata=config(field_name="optimizerConfig"),
@@ -50,8 +52,10 @@ class HyperParameterConfiguration:
                                                         default_factory=_none_factory)
     bs: Optional[int] = field(metadata=config(field_name="batchSize"),
                               default_factory=_none_factory)
-    test_bs: Optional[int] = field(metadata=config(field_name="testBatchSize"), default_factory=_none_factory)
-    lr_decay: Optional[float] = field(metadata=config(field_name="learningRateDecay"), default_factory=_none_factory)
+    test_bs: Optional[int] = field(metadata=config(
+        field_name="testBatchSize"), default_factory=_none_factory)
+    lr_decay: Optional[float] = field(metadata=config(
+        field_name="learningRateDecay"), default_factory=_none_factory)
     total_epochs: int = None
 
     def merge_default(self, other: Dict[str, Any]) -> "HyperParameterConfiguration":
@@ -85,13 +89,16 @@ def merge_optional(default_dict: Dict[str, Any], update_dict: Dict[str, Any], tp
             if all(isinstance(e, MutableMapping) for e in (v, update_dict[k])):
                 update_dict[k] = merge_optional(v, update_dict[k], tpe)
         else:
-            logging.warning(f"Gotten unknown alternative mapping {k}:{v} for {tpe}")
+            logging.warning(
+                f"Gotten unknown alternative mapping {k}:{v} for {tpe}")
 
     # Base case
-    update = list(filter(lambda item: item[1] is not None, update_dict.items()))
+    update = list(
+        filter(lambda item: item[1] is not None, update_dict.items()))
     for k, v in update:  # pylint: disable=invalid-name
         if not isinstance(v, dict):
-            logging.info(f'Updating {k} from {default_copy[k]} to {v} for {tpe}')
+            logging.info(
+                f'Updating {k} from {default_copy[k]} to {v} for {tpe}')
         default_copy[k] = v
     return default_copy
 
@@ -111,16 +118,18 @@ def merge_optional_dataclass(default: T, update: T, data_type: Type[T], learner_
 
     """
     if isinstance(update, default.__class__):
-        merged = data_type.from_dict(merge_optional(default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
+        merged = data_type.from_dict(merge_optional(
+            default.to_dict(), update.to_dict(), learner_type))  # pylint: disable=no-member
         return merged
-    raise Exception(f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
+    raise Exception(
+        f"Cannot merge dataclasses of different type: {default.__class__} and {update.__class__}")
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
 @dataclass(frozen=True)
 class HyperParameters:
     """Learning HyperParameters.
-    
+
     bs: Number of images that are used during each forward/backward phase.
     max_epoch: Number of times epochs are executed.
     lr: Learning rate parameter, limiting the step size in the gradient update.
@@ -140,7 +149,8 @@ class HyperParameters:
             if not (conf := self.configurations.get(learner_type, self.default)):
                 self.configurations[learner_type] = self.default
             else:
-                updated_conf = merge_optional_dataclass(self.default, conf, HyperParameterConfiguration, learner_type)
+                updated_conf = merge_optional_dataclass(
+                    self.default, conf, HyperParameterConfiguration, learner_type)
 
                 self.configurations[learner_type] = updated_conf
 
@@ -162,6 +172,7 @@ class Priority:
     """Job class priority, indicating the presedence of one arrival over another."""
     priority: int
     probability: float
+    deadline: float
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)
@@ -249,14 +260,16 @@ class JobClassParameter:
 class JobDescription:
     """Dataclass describing the characteristics of a Job type, as well as the corresponding arrival statistic.
     Currently, the arrival statistics is the lambda value used in a Poisson arrival process.
-    
+
     preemtible_jobs: indicates whether the jobs can be pre-emptively rescheduled by the scheduler. This is currently
     not implemented in FLTK, but could be added as a project (advanced).
     """
     experiment_type: ExperimentType = field(metadata=config(field_name='type'))
     job_class_parameters: List[JobClassParameter]
-    preemtible_jobs: Optional[bool] = field(metadata=config(field_name='preemptJobs'), default_factory=_none_factory)
-    arrival_statistic: Optional[float] = field(metadata=config(field_name='lambda'), default_factory=_none_factory)
+    preemtible_jobs: Optional[bool] = field(metadata=config(
+        field_name='preemptJobs'), default_factory=_none_factory)
+    arrival_statistic: Optional[float] = field(metadata=config(
+        field_name='lambda'), default_factory=_none_factory)
 
 
 @dataclass_json(letter_case=LetterCase.CAMEL)

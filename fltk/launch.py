@@ -47,11 +47,13 @@ def exec_distributed_client(task_id: str, conf: DistributedConfig = None,
     @return: None
     @rtype: None
     """
-    logging.info(f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
+    logging.info(
+        f'Starting with host={os.environ["MASTER_ADDR"]} and port={os.environ["MASTER_PORT"]}')
     rank, world_size = 0, None
     distributed = should_distribute()
     if distributed:
-        logging.info(f'Initializing backend for training process: {namespace.backend}')
+        logging.info(
+            f'Initializing backend for training process: {namespace.backend}')
         dist.init_process_group(namespace.backend)
         rank = dist.get_rank()
         world_size = dist.get_world_size()
@@ -123,7 +125,8 @@ def exec_orchestrator(args: Namespace = None, conf: DistributedConfig = None, re
 
     pool.close()
 
-    logging.info(f"Stopped execution of Orchestrator replication: {replication}.")
+    logging.info(
+        f"Stopped execution of Orchestrator replication: {replication}.")
 
 
 def launch_extractor(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC] = None,
@@ -188,7 +191,8 @@ def launch_client(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     # for each repetition that you want to run an experiment with.
     init_learning_reproducibility(learning_params)
     task_id = args.task_id
-    exec_distributed_client(task_id, conf=conf, learning_params=learning_params, namespace=args)
+    exec_distributed_client(
+        task_id, conf=conf, learning_params=learning_params, namespace=args)
     logging.info("Stopping client...")
 
 
@@ -267,24 +271,25 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
         print(f"Retrieved: rank {rank} w_s {world_size} m_p {master_port}")
         r_conf.world_size = world_size
     else:
-        raise Exception('Missing rank, host, world-size, checking environment!')
+        raise Exception(
+            'Missing rank, host, world-size, checking environment!')
 
     msg = f'Starting with host={host} and port={os.environ["MASTER_PORT"]} and interface={nic}'
     logging.log(logging.INFO, msg)
     # fixme: Move to async implementation to prevent CPP memory leak
     options = rpc.TensorPipeRpcBackendOptions(
-            num_worker_threads=16 if rank == 0 else 4,
-            rpc_timeout=0,  # infinite timeout
-            init_method='env://',
-            _transports=["uv"]  # Use LibUV backend for async/IO interaction
+        num_worker_threads=16 if rank == 0 else 4,
+        rpc_timeout=0,  # infinite timeout
+        init_method='env://',
+        _transports=["uv"]  # Use LibUV backend for async/IO interaction
     )
     if rank != 0:
         print(f'Starting worker-{rank} with world size={r_conf.world_size}')
         rpc.init_rpc(
-                f"client{rank}",
-                rank=rank,
-                world_size=r_conf.world_size,
-                rpc_backend_options=options,
+            f"client{rank}",
+            rank=rank,
+            world_size=r_conf.world_size,
+            rpc_backend_options=options,
         )
         client_node = Client(f'client{rank}', rank, r_conf.world_size, r_conf)
         client_node.remote_registration()
@@ -292,10 +297,10 @@ def launch_remote(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NIC
     else:
         print(f'Starting the PS (Fed) with world size={r_conf.world_size}')
         rpc.init_rpc(
-                "federator",
-                rank=rank,
-                world_size=r_conf.world_size,
-                rpc_backend_options=options
+            "federator",
+            rank=rank,
+            world_size=r_conf.world_size,
+            rpc_backend_options=options
         )
 
         federator_node = Federator('federator', 0, r_conf.world_size, r_conf)
@@ -335,15 +340,16 @@ def launch_cluster(arg_path: Path, conf_path: Path, rank: Rank, nic: Optional[NI
     @return: None
     @rtype: None
     """
-    logging.info(f"Starting in cluster mode{' (locally)' if args.local else ''}.")
+    logging.info(
+        f"Starting in cluster mode{' (locally)' if args.local else ''}.")
     logging.basicConfig(level=logging.DEBUG,
                         datefmt='%m-%d %H:%M')
-
 
     # Set the seed for arrivals, torch seed is mostly ignored. Set the `arrival_seed` to a different value
     # for each repetition that you want to run an experiment with.
     for replication, experiment_seed in enumerate(conf.execution_config.reproducibility.seeds):
-        logging.info(f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
+        logging.info(
+            f"Starting with experiment replication: {replication} with seed: {experiment_seed}")
         init_reproducibility(conf.execution_config)
         try:
             exec_orchestrator(args=args, conf=conf, replication=replication)

@@ -6,7 +6,7 @@ variable "kubernetes_version" {
 
 variable "project_id" {
   type        = string
-  default     = "test-bed-fltk"
+  default     = "test-bed-fltk69420"
   description = "Google Cloud project name to create cluster in."
 }
 
